@@ -1,0 +1,103 @@
+name: NS2d
+file: evaluate.py
+
+model: DPOT
+dataset: ns2d
+use_writer: False
+res: 128
+modes: 20
+width: 32
+lr: 0.001
+lr_method: cycle
+warmup_epochs: 40
+step_size: 100
+step_gamma: 0.5
+epochs: 200
+noise_scale: 0.0005
+T_ar: 1
+use_ln: 1
+normalize: 0
+T_bundle: 1
+grad_clip: 10000.0
+n_channels: 4
+n_class: 12
+
+test_paths: [
+  'ns2d_fno_1e-5',
+  'ns2d_fno_1e-4',
+  'ns2d_fno_1e-3',
+  'ns2d_pdb_M1_eta1e-1_zeta1e-1',
+  'ns2d_pdb_M1_eta1e-2_zeta1e-2',
+  'ns2d_pdb_M1e-1_eta1e-1_zeta1e-1',
+  'ns2d_pdb_M1e-1_eta1e-2_zeta1e-2',
+  'swe_pdb',
+  'dr_pdb',
+  'ns2d_pda',
+  'ns2d_cond_pda',
+  'cfdbench'
+]
+ntest_list: [200, 200, 200, 1000, 1000, 1000, 1000, 100, 100, 1300, 600, 1000]
+#
+
+#####################################################
+##########   DPOT-Ti
+#####################################################
+#resume_path: 'logs_pretrain/DPOT_tiny_model.pth'
+#tasks:
+#  comment: ['eva']
+#  batch_size: [20]
+#  mlp_ratio: [1]
+#  res: [128]
+#  modes: [32]
+#  patch_size: [8]
+#  width: [512]
+#  n_layers: [4]
+#  n_blocks: [4]
+
+######################################################
+###########   DPOT-S
+######################################################
+#resume_path: 'logs_pretrain/DPOT_small_model.pth'
+#tasks:
+#  comment: ['ft_swe']
+#  batch_size: [20]
+#  mlp_ratio: [1]
+#  res: [128]
+#  modes: [32]
+#  patch_size: [8]
+#  width: [1024]
+#  n_layers: [6]
+#  n_blocks: [8]
+
+#####################################################
+##########   DPOT-M
+#####################################################
+#resume_path: 'logs_pretrain/DPOT_medium_model.pth'
+#tasks:
+#  comment: ['ft_swe']
+#  batch_size: [20]
+#  mlp_ratio: [4]
+#  res: [128]
+#  modes: [32]
+#  patch_size: [8]
+#  width: [1024]
+#  n_layers: [12]
+#  n_blocks: [8]
+
+#####################################################
+##########   DPOT-L
+#####################################################
+resume_path: 'logs_pretrain/DPOT_large_model.pth'
+tasks:
+  comment: ['eva']
+  batch_size: [20]
+  mlp_ratio: [4]
+  res: [128]
+  modes: [32]
+  patch_size: [8]
+  width: [1536]
+  out_layer_dim: [128]
+  n_layers: [24]
+  n_blocks: [16]
+
+

@@ -1,0 +1,89 @@
+name: NS2d
+file: train_temporal_parallel.py
+
+dataset: ns2d
+use_writer: True
+res: 128
+modes: 20
+width: 32
+out_layer_dim: 32
+lr: 0.001
+lr_method: cycle
+step_size: 100
+step_gamma: 0.5
+epochs: 1000
+warmup_epochs: 200
+noise_scale: 0.0
+T_ar: 1
+use_ln: 0
+normalize: 0
+T_bundle: 1
+grad_clip: 10000.0
+
+
+
+train_paths: [
+  'ns2d_fno_1e-5',
+  'ns2d_fno_1e-4',
+  'ns2d_fno_1e-3',
+  'ns2d_pdb_M1_eta1e-1_zeta1e-1',
+  'ns2d_pdb_M1_eta1e-2_zeta1e-2',
+  'ns2d_pdb_M1e-1_eta1e-1_zeta1e-1',
+  'ns2d_pdb_M1e-1_eta1e-2_zeta1e-2',
+  'swe_pdb',
+  'dr_pdb',
+  'ns2d_pda',
+  'ns2d_cond_pda',
+  'cfdbench'
+]
+test_paths: [
+  'ns2d_fno_1e-5',
+  'ns2d_fno_1e-4',
+  'ns2d_fno_1e-3',
+  'ns2d_pdb_M1_eta1e-1_zeta1e-1',
+  'ns2d_pdb_M1_eta1e-2_zeta1e-2',
+  'ns2d_pdb_M1e-1_eta1e-1_zeta1e-1',
+  'ns2d_pdb_M1e-1_eta1e-2_zeta1e-2',
+  'swe_pdb',
+  'dr_pdb',
+  'ns2d_pda',
+  'ns2d_cond_pda',
+  'cfdbench'
+]
+ntrain_list: [1000,9800,1000,9000,9000,9000,9000,900,900,6500,3100,9000]
+
+
+
+
+
+
+##########################################################
+########## Large model
+##########################################################
+model: DPOT
+num_gpus: 8
+opt: adam
+comment: 'L'
+data_weights: [8,2,8,1,1,1,1,15,20,1,3,1]
+tasks:
+  normalize: [0]
+  res: [128]
+  patch_size: [8]
+  noise_scale: [0.00005]
+  modes: [32]
+  width: [1536]
+  mlp_ratio: [4]
+  out_layer_dim: [128]
+  n_blocks: [8]  ### 8????
+  n_layers: [24]
+  lr: [0.001]
+  epochs: [1000]
+  lr_method: [cycle]
+  warmup_epochs: [200]
+  T_ar: [1]
+  T_bundle: [1]
+  beta1: [0.9]
+  beta2: [0.9]
+  batch_size: [25]
+
+

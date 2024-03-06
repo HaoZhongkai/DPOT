@@ -1,0 +1,114 @@
+name: NS2d
+file: finetune.py
+
+model: DPOT
+dataset: ns2d
+use_writer: True
+res: 128
+modes: 32
+patch_size: 8
+lr: 0.001
+lr_method: cycle
+warmup_epochs: 40
+step_size: 100
+step_gamma: 0.5
+epochs: 500
+noise_scale: 0.0005
+T_ar: 1
+use_ln: 1
+normalize: 0
+T_bundle: 1
+grad_clip: 10000.0
+beta1: 0.9
+beta2: 0.9
+n_channels: 4
+n_class: 12
+
+##########################################
+############ Tiny models
+##########################################
+#resume_path: 'logs_pretrain/DPOT_tiny_model.pth'
+#load_components: ['all']
+#n_layers: 4
+#n_blocks: 4
+#mlp_ratio: 1
+#width: 512
+
+########################################
+##########  Small models
+########################################
+
+resume_path: './logs_pretrain/DPOT_small_model.pth'
+load_components: ['all']
+n_layers: 6
+n_blocks: 8
+mlp_ratio: 1
+width: 1024
+
+
+##########################################
+############  Medium models
+##########################################
+#resume_path: 'logs_pretrain/DPOT_medium_model.pth'
+#load_components: ['all']
+#n_layers: 12
+#n_blocks: 8
+#mlp_ratio: 4
+#width: 1024
+
+#
+##########################################
+############  Large models
+##########################################
+#resume_path: 'logs_pretrain/DPOT_large_model.pth'
+#load_components: ['all']
+#n_layers: 24
+#n_blocks: 16
+#mlp_ratio: 4
+#width: 1536
+#out_layer_dim: 128
+
+tasks:
+  comment: ['Sft_pda']
+
+  epochs: [200]
+  warmup_epochs: [40]
+  batch_size: [32]
+  noise_scale: [0.0]
+  train_paths: [
+#         ['ns2d_fno_1e-5'],
+#         ['ns2d_fno_1e-4'],
+#         ['ns2d_fno_1e-3'],
+#         ['ns2d_pdb_M1_eta1e-1_zeta1e-1'],
+#         ['ns2d_pdb_M1_eta1e-2_zeta1e-2'],
+#         ['ns2d_pdb_M1e-1_eta1e-1_zeta1e-1'],
+#         ['ns2d_pdb_M1e-1_eta1e-2_zeta1e-2'],
+#        ['swe_pdb']
+#         ['dr_pdb'],
+#         ['ns2d_pda'],
+        ['ns2d_cond_pda']
+#         ['cfdbench'],
+  ]
+  test_paths: [
+#             ['ns2d_fno_1e-5'],
+#        ['ns2d_fno_1e-4'],
+#        ['ns2d_fno_1e-3'],
+#        ['ns2d_pdb_M1_eta1e-1_zeta1e-1'],
+#         ['ns2d_pdb_M1_eta1e-2_zeta1e-2'],
+#         ['ns2d_pdb_M1e-1_eta1e-1_zeta1e-1'],
+#         ['ns2d_pdb_M1e-1_eta1e-2_zeta1e-2'],
+#        ['swe_pdb']
+#        ['dr_pdb'],
+#        ['ns2d_pda'],
+        ['ns2d_cond_pda']
+#        ['cfdbench'],
+  ]
+  ntrain_list: [
+#        [9800],
+#        [1000],
+#        [9000],
+#        [900],
+#        [6500],
+         [3100]
+#        [9000],
+  ]

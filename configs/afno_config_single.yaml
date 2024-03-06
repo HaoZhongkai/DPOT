@@ -1,0 +1,175 @@
+name: NS2d
+file: train_temporal.py
+
+model: AFNO
+dataset: ns2d
+use_writer: True
+res: 128
+lr: 0.001
+noise_scale: 0.0005
+T_ar: 1
+T_bundle: 1
+grad_clip: 1000.0
+
+
+##############################################################################
+##############  small AFNO, 32, 384, cycle 1000
+##############################################################################
+modes: 32
+width: 512
+patch_size: 8
+n_layers: 4
+n_blocks: 8
+batch_size: 8
+epochs: 1000
+opt: adam
+lr_method: cycle
+step_size: 100
+step_gamma: 0.5
+warmup_epochs: 200
+normalize: 0
+beta1: 0.9
+beta2: 0.9
+
+
+##########################################
+#####  main experiments for shallow water
+##########################################
+#tasks:
+#  comment: ['s_swe',s_pdb']
+#  train_paths: [
+#    ['swe_pdb'],
+#    ['dr_pdb']
+#  ]
+#  test_paths: [
+#    ['swe_pdb'],
+#    ['dr_pdb']
+#  ]
+#  ntrain_list: [
+#    [900],
+#    [900]
+#  ]
+
+##########################################
+#####  main experiments for cfdbench
+##########################################
+#tasks:
+#  comment: ['cfd']
+#  res: [64]
+#  train_paths: [
+#    ['cfdbench'],
+#  ]
+#  test_paths: [
+#    ['cfdbench'],
+#  ]
+#  ntrain_list: [
+#    [9000],
+#  ]
+#  batch_size: [20]
+
+##########################################
+#####  main experiments for cfdbench
+##########################################
+#tasks:
+#  comment: ['pda1']
+#  res: [128]
+#  train_paths: [
+#    ['ns2d_pda'],
+#  ]
+#  test_paths: [
+#    ['ns2d_pda'],
+#  ]
+#  ntrain_list: [
+#    [6500],
+#  ]
+#  batch_size: [20]
+
+#tasks:
+#  comment: ['pda2']
+#  res: [128]
+#  train_paths: [
+#    ['ns2d_cond_pda'],
+#  ]
+#  test_paths: [
+#    ['ns2d_cond_pda'],
+#  ]
+#  ntrain_list: [
+#    [3100],
+#  ]
+#  batch_size: [20]
+
+#tasks:
+#  comment: ['sw_pda']
+#  normalize: [1]
+#  res: [128]
+#  train_paths: [
+#    ['sw2d_pda'],
+#  ]
+#  test_paths: [
+#    ['sw2d_pda'],
+#  ]
+#  ntrain_list: [
+#    [7000],
+#  ]
+#  batch_size: [32]
+
+
+############################################
+######  test new version of AFNO
+############################################
+#tasks:
+#  comment: ['relu_small_init']
+#  batch_size: [32]
+#  mlp_ratio: [1]
+#  act: ['relu']
+#  res: [128]
+#  train_paths: [
+##    ['ns2d_fno_1e-5'],
+#    ['sw2d_pda']
+#  ]
+#  test_paths: [
+##    ['ns2d_fno_1e-5'],
+#    ['sw2d_pda']
+#  ]
+#  ntrain_list: [
+##    [1000]
+#    [7000],
+#  ]
+
+
+############################################
+######  test stability of testing metric
+############################################
+tasks:
+  comment: ['T-fno']
+  batch_size: [32]
+  mlp_ratio: [1]
+  act: ['gelu']
+  res: [128]
+  train_paths: [
+#    ['ns2d_fno_1e-5'],
+     ['ns2d_pdb_M1_eta1e-1_zeta1e-1']
+#    ['ns2d_pda']
+#    ['ns2d_cond_pda']
+#    ['cfdbench'],
+#     ['swe_pdb']
+#     ['dr_pdb']
+  ]
+  test_paths: [
+#    ['ns2d_fno_1e-5'],
+     ['ns2d_pdb_M1_eta1e-1_zeta1e-1']
+#    ['ns2d_pda']
+#    ['ns2d_cond_pda']
+#    ['cfdbench']
+#     ['swe_pdb']
+#     ['dr_pdb']
+  ]
+  ntrain_list: [
+#    [1000]
+    [9000],
+#    [6500],
+#    [3100],
+#    [9000],
+#     [900]
+  ]
+
