@@ -1,6 +1,6 @@
 # Pretraining  Neural Operators on Multiphysics Data
 
-Code for pretraining neural operators on multiple PDE datasets.
+Code for pretraining neural operators on multiple PDE datasets. We will update more details soon.
 
 ![fig1](/resources/dpot.jpg)
 
