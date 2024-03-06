@@ -1,6 +1,6 @@
-# Pretraining  Neural Operators on Multiphysics Data
+# DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training
 
-Code for pretraining neural operators on multiple PDE datasets. We will update more details soon.
+Code for pretraining neural operator transformers on multiple PDE datasets. We will update more details soon.
 
 ![fig1](/resources/dpot.jpg)
 
