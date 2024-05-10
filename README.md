@@ -1,8 +1,12 @@
-# DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training
+## DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training (ICML'2024)
 
-Code for pretraining neural operator transformers on multiple PDE datasets. We will update more details soon.
+Code for [paper](https://arxiv.org/pdf/2403.03542) DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training (ICML'2024). It  pretrains neural operator transformers (from **7M** to **1B**)  on multiple PDE datasets. We will release the pre-trained weights soon.
 
 ![fig1](/resources/dpot.jpg)
+
+Our pre-trained DPOT achieves the state-of-the-art performance on multiple PDE datasets and could be used for finetuning on different types of downstream PDE problems.
+
+![fig2](/resources/dpot_result.jpg)
 
 
 
@@ -32,7 +36,7 @@ mkdir data
 Now we have a single GPU pretraining code script `train_temporal.py`, you could start it by 
 
 ```bash
-python train_temporal.py --model FNO --train_paths ns2d_fno_1e-5 --test_paths ns2d_fno_1e-5 --gpu 0 
+python train_temporal.py --model DPOT --train_paths ns2d_fno_1e-5 --test_paths ns2d_fno_1e-5 --gpu 0 
 ```
 
 to start a training process.
@@ -93,3 +97,18 @@ conda install timm einops tensorboard -c conda-forge
 - `data_generation/`:  Some code for preprocessing data (ask hzk if you want to use them)
   - `darcy/`
   - `ns2d/`
+
+
+
+### Citation
+
+If you use DPOT in your research, please use the following BibTeX entry.
+
+```
+@article{hao2024dpot,
+  title={DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training},
+  author={Hao, Zhongkai and Su, Chang and Liu, Songming and Berner, Julius and Ying, Chengyang and Su, Hang and Anandkumar, Anima and Song, Jian and Zhu, Jun},
+  journal={arXiv preprint arXiv:2403.03542},
+  year={2024}
+}
+```

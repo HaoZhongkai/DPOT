@@ -9,14 +9,7 @@ import argparse
 import torch
 import numpy as np
 import torch.nn as nn
-import torch.nn.functional as F
 
-import matplotlib.pyplot as plt
-
-
-import operator
-from functools import reduce
-from functools import partial
 
 from accelerate import Accelerator
 from timeit import default_timer
@@ -31,11 +24,7 @@ from models.fno import FNO2d
 from models.dpot import DPOTNet
 from models.dpot_res import CDPOTNet
 
-# from models.gnot_legacy import CGPTNO
-import pickle
 
-# torch.manual_seed(0)
-# np.random.seed(0)
 
 
 
@@ -47,7 +36,6 @@ import pickle
 def get_args():
     parser = argparse.ArgumentParser(description='Training or pretraining for the same data type')
 
-    ### currently no influence
     parser.add_argument('--model', type=str, default='FNO')
     parser.add_argument('--dataset',type=str, default='ns2d')
 
@@ -69,8 +57,6 @@ def get_args():
     parser.add_argument('--n_layers',type=int, default=4)
     parser.add_argument('--act',type=str, default='gelu')
 
-    ### GNOT params
-    parser.add_argument('--max_nodes',type=int, default=-1)
 
     ### FNO params
     parser.add_argument('--modes', type=int, default=16)
@@ -89,7 +75,7 @@ def get_args():
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--opt',type=str, default='adam', choices=['adam','lamb'])
     parser.add_argument('--beta1',type=float,default=0.9)
-    parser.add_argument('--beta2',type=float,default=0.999)
+    parser.add_argument('--beta2',type=float,default=0.9)
     parser.add_argument('--lr_method',type=str, default='step')
     parser.add_argument('--grad_clip',type=float, default=10000.0)
     parser.add_argument('--step_size', type=int, default=100)
@@ -153,13 +139,10 @@ if __name__ == "__main__":
         load_model_from_checkpoint(model, torch.load(args.resume_path, map_location='cpu')['model'])
 
     #### set optimizer
-    if args.model in ['FNO','DPOT']:
-        if args.opt == 'lamb':
-            optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
-        else:
-            optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+    if args.opt == 'lamb':
+        optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
     else:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+        optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
 
 
     if args.lr_method == 'cycle':
@@ -219,7 +202,6 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
 
         for xx, yy, msk, cls in train_loader:
-            # print('len loader',len(train_loader))
             t_load += default_timer() - t_1
             t_1 = default_timer()
 
@@ -271,7 +253,6 @@ if __name__ == "__main__":
             if args.use_writer:
                 writer.add_scalar("train_loss_step", loss.item()/(xx.shape[0] * yy.shape[-2] / args.T_bundle), iter)
                 writer.add_scalar("train_loss_full", l2_full / xx.shape[0], iter)
-                writer.add_scalar("cls_acc", cls_acc)
 
                 ## reset model
                 if loss.item() > 10 * loss_previous : # or (ep > 50 and l2_full / xx.shape[0] > 0.9):
@@ -284,7 +265,6 @@ if __name__ == "__main__":
             t_train += default_timer() -  t_1
             t_1 = default_timer()
 
-            # print('training ',time.time() - t_0)
 
 
         test_l2_fulls, test_l2_steps = [], []
@@ -299,9 +279,6 @@ if __name__ == "__main__":
                     yy = yy.to(device)
                     msk = msk.to(device)
 
-                    if args.model == 'GNOT':
-                        xx= get_grid(xx, n_dim=2, multi_channel=True)
-                        xx, yy = xx.view(xx.shape[0], -1, xx.shape[-2], xx.shape[-1]), yy.view(yy.shape[0], -1, yy.shape[-2], yy.shape[-1])
 
                     for t in range(0, yy.shape[-2], args.T_bundle):
                         y = yy[..., t:t + args.T_bundle, :]
@@ -318,7 +295,6 @@ if __name__ == "__main__":
                     metrics_gathered = torch.cat(accelerator.gather_for_metrics((myloss(pred, yy, mask=msk),)))
                     test_l2_full += metrics_gathered.sum()
                     ntest += metrics_gathered.shape[0] * xx.shape[0]
-                    # print(os.getpid(),xx.shape[0],ntest)
 
                 test_l2_step_avg, test_l2_full_avg = test_l2_step / ntest / (yy.shape[-2] / args.T_bundle), test_l2_full.item() / ntest
                 test_l2_steps.append(test_l2_step_avg)
@@ -326,7 +302,6 @@ if __name__ == "__main__":
                 if args.use_writer:
                     writer.add_scalar("test_loss_step_{}".format(test_paths[id]), test_l2_step_avg, ep)
                     writer.add_scalar("test_loss_full_{}".format(test_paths[id]), test_l2_full_avg, ep)
-                    # writer.add_histogram('test_loss_full_hist_{}'.format(test_paths[id]), torch.tensor(test_l2_fulls), ep)
 
         if args.use_writer:
             torch.save({'args': args, 'model': model.state_dict(), 'optimizer': optimizer.state_dict()}, model_path_fun(ep // ckpt_save_epochs))

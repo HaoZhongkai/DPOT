@@ -6,34 +6,10 @@ import torch.fft
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Bring your packages onto the path
-import sys
-
-# from afno.afno2d import AFNO2D
-# from afno.bfno2d import BFNO2D
-# from afno.ls import AttentionLS
-# from afno.sa import SelfAttention
-# from afno.gfn import GlobalFilter
 
 
 import math
 import logging
-from functools import partial
-from collections import OrderedDict
-# from copy import Error, deepcopy
-# from re import S
-# from numpy.lib.arraypad import pad
-# import numpy as np
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-
-# from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-# from timm.models.layers import  to_2tuple, trunc_normal_
-# import torch.fft
-from torch.nn.modules.container import Sequential
-# from main_afnonet import get_args
-# from torch.utils.checkpoint import checkpoint_sequential
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
@@ -44,26 +20,16 @@ ACTIVATION = {'gelu':nn.GELU(),'tanh':nn.Tanh(),'sigmoid':nn.Sigmoid(),'relu':nn
 
 
 class AFNO3D(nn.Module):
-    """
-    hidden_size: channel dimension size
-    num_blocks: how many blocks to use in the block diagonal weight matrices (higher => less complexity but less parameters)
-    sparsity_threshold: lambda for softshrink
-    hard_thresholding_fraction: how many frequencies you want to completely mask out (lower => hard_thresholding_fraction^2 less FLOPs)
-    """
-    def __init__(self, width = 32, in_timesteps = 10, out_timesteps = 1, n_channels = 1, num_blocks=8, channel_first = False,sparsity_threshold=0.01, modes = 32, temporal_modes = 8,hard_thresholding_fraction=1, hidden_size_factor=1, act='gelu'):
+    def __init__(self, width = 32, num_blocks=8, channel_first = False,sparsity_threshold=0.01, modes = 32, temporal_modes = 8,hard_thresholding_fraction=1, hidden_size_factor=1, act='gelu'):
         super(AFNO3D, self).__init__()
         assert width % num_blocks == 0, f"hidden_size {width} should be divisble by num_blocks {num_blocks}"
 
-        # self.in_timesteps = in_timesteps
-        # self.out_timesteps = out_timesteps
-        # self.n_channels = n_channels
 
         self.hidden_size = width
         self.sparsity_threshold = sparsity_threshold
         self.num_blocks = num_blocks
         self.block_size = self.hidden_size // self.num_blocks
         self.channel_first = channel_first
-        # self.hard_thresholding_fraction = hard_thresholding_fraction
         self.modes = modes
         self.temporal_modes = temporal_modes
         self.hidden_size_factor = hidden_size_factor
@@ -76,18 +42,14 @@ class AFNO3D(nn.Module):
         self.w2 = nn.Parameter(self.scale * torch.rand(2, self.num_blocks, self.block_size * self.hidden_size_factor, self.block_size))
         self.b2 = nn.Parameter(self.scale * torch.rand(2, self.num_blocks, self.block_size))
 
-    ### N, C, X, Y
+    ### N, C, X, Y, Z
     def forward(self, x, spatial_size=None):
         if self.channel_first:
             x = rearrange(x, 'b c x y z -> b x y z c')
         B, H, W, L, C = x.shape
-        # x = x.view(*x.shape[:-2], -1)  #### B, X, Y, T*C
-        # grid = self.get_grid(x)
-        # x = torch.cat((x, grid), dim=-1)  #### B, X, Y, T, C
         x_orig = x
 
         x = torch.fft.rfftn(x, dim=(1, 2, 3), norm="ortho")
-        # x = torch.fft.rfft2(x, dim=(1, 2))
 
         x = x.reshape(B, x.shape[1], x.shape[2], x.shape[3], self.num_blocks, self.block_size)
 
@@ -128,26 +90,12 @@ class AFNO3D(nn.Module):
         x = torch.view_as_complex(x)
         x = x.reshape(B, x.shape[1], x.shape[2], x.shape[3], C)
         x = torch.fft.irfftn(x, s=(H, W, L), dim=(1, 2, 3), norm="ortho")
-        # x = torch.fft.irfft2(x, s=(H, W), dim=(1, 2))
-
-        # x = x.reshape(B, N, C)
-        # x = x.type(dtype)
-
-        # x = x.reshape(*x.shape[: -1], self.out_timesteps, C)
 
         x = x + x_orig
         if self.channel_first:
             x = rearrange(x, 'b x y t c -> b c x y t')
         return x
 
-    # def get_grid(self, x):
-    #     batchsize, size_x, size_y = x.shape[0], x.shape[1], x.shape[2]
-    #     gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-    #     gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-    #     gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
-    #     gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-    #     grid = torch.cat((gridx, gridy), dim=-1).to(x.device)
-    #     return grid
 
 
 
@@ -166,77 +114,15 @@ class Mlp(nn.Module):
         self.fc1 = nn.Linear(in_features, hidden_features)
         self.act = act_layer()
         self.fc2 = nn.Linear(hidden_features, out_features)
-        # self.drop = nn.Dropout(drop)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.act(x)
-        # x = self.drop(x)
         x = self.fc2(x)
-        # x = self.drop(x)
         return x
 
 
-# class AdaptiveFourierNeuralOperator(nn.Module):
-#     def __init__(self, dim, n_blocks = 4, h=14, w=8, bias=True, softshrink=0.1):
-#         super().__init__()
-#
-#         self.hidden_size = dim
-#         self.h = h
-#         self.w = w
-#         self.num_blocks = n_blocks
-#         self.bias = bias
-#         self.block_size = self.hidden_size // self.num_blocks
-#         assert self.hidden_size % self.num_blocks == 0
-#
-#         self.scale = 0.02
-#         self.w1 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size, self.block_size))
-#         self.b1 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size))
-#         self.w2 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size, self.block_size))
-#         self.b2 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size))
-#         self.relu = nn.ReLU()
-#
-#         if bias:
-#             self.bias = nn.Conv1d(self.hidden_size, self.hidden_size, 1)
-#         else:
-#             self.bias = None
-#
-#         self.softshrink = softshrink
-#
-#     def multiply(self, input, weights):
-#         return torch.einsum('...bd,bdk->...bk', input, weights)
-#
-#     def forward(self, x, spatial_size=None):
-#         B, N, C = x.shape
-#         if spatial_size is None:
-#             a = b = int(math.sqrt(N))
-#         else:
-#             a, b = spatial_size
-#
-#         if self.bias:
-#             bias = self.bias(x.permute(0, 2, 1)).permute(0, 2, 1)
-#         else:
-#             bias = torch.zeros(x.shape, device=x.device)
-#
-#         x = x.reshape(B, a, b, C).float()
-#         x = torch.fft.rfft2(x, dim=(1, 2), norm='ortho')
-#         x = x.reshape(B, x.shape[1], x.shape[2], self.num_blocks, self.block_size)
-#
-#         x_real_1 = F.relu(self.multiply(x.real, self.w1[0]) - self.multiply(x.imag, self.w1[1]) + self.b1[0])
-#         x_imag_1 = F.relu(self.multiply(x.real, self.w1[1]) + self.multiply(x.imag, self.w1[0]) + self.b1[1])
-#         x_real_2 = self.multiply(x_real_1, self.w2[0]) - self.multiply(x_imag_1, self.w2[1]) + self.b2[0]
-#         x_imag_2 = self.multiply(x_real_1, self.w2[1]) + self.multiply(x_imag_1, self.w2[0]) + self.b2[1]
-#
-#         x = torch.stack([x_real_2, x_imag_2], dim=-1).float()
-#         x = F.softshrink(x, lambd=self.softshrink) if self.softshrink else x
-#
-#         x = torch.view_as_complex(x)
-#         x = x.reshape(B, x.shape[1], x.shape[2], self.hidden_size)
-#         x = torch.fft.irfft2(x, s=(a, b), dim=(1, 2), norm='ortho')
-#         x = x.reshape(B, N, C)
-#
-#         return x + bias
-#
+
 
 
 class TimeAggregator(nn.Module):
@@ -251,6 +137,8 @@ class TimeAggregator(nn.Module):
         elif self.type == 'exp_mlp':
             self.w = nn.Parameter(1/(n_timesteps * out_channels**0.5) *torch.randn(n_timesteps, out_channels, out_channels),requires_grad=True)   # initialization could be tuned
             self.gamma = nn.Parameter(2**torch.linspace(-10,10, out_channels).unsqueeze(0),requires_grad=True)  # 1, C
+
+
     ##  B, X, Y, T, C
     def forward(self, x):
         if self.type == 'mlp':
@@ -268,8 +156,6 @@ class TimeAggregator(nn.Module):
 class PatchEmbed(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, out_dim=128, act='gelu'):
         super().__init__()
-        # img_size = to_2tuple(img_size)
-        # patch_size = to_2tuple(patch_size)
         img_size = (img_size, img_size, img_size)
         patch_size = (patch_size, patch_size, patch_size)
         num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0]) * ( img_size[2] // patch_size[2])
@@ -289,7 +175,6 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         B, C, H, W, L = x.shape
         assert H == self.img_size[0] and W == self.img_size[1] and L == self.img_size[2], f"Input image size ({H}*{W}*{L}) doesn't match model ({self.img_size[0]}*{self.img_size[1]}*{self.img_size[2]})."
-        # x = self.proj(x).flatten(2).transpose(1, 2)
         x = self.proj(x)
         return x
 
@@ -297,10 +182,7 @@ class PatchEmbed(nn.Module):
 class Block(nn.Module):
     def __init__(self, mixing_type = 'afno', double_skip = True, width = 32, n_blocks = 4, mlp_ratio=1., channel_first = True, modes = 32, drop=0., drop_path=0., act='gelu', h=14, w=8,):
         super().__init__()
-        # self.norm1 = norm_layer(width)
-        # self.norm1 = torch.nn.LayerNorm([width])
         self.norm1 = torch.nn.GroupNorm(8, width)
-        # self.norm1 = torch.nn.InstanceNorm2d(width,affine=True,track_running_stats=False)
         self.width = width
         self.modes = modes
         self.act = ACTIVATION[act]
@@ -315,12 +197,9 @@ class Block(nn.Module):
 
 
         mlp_hidden_dim = int(width * mlp_ratio)
-        # self.mlp = Mlp(in_features=width, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
         self.mlp = nn.Sequential(
             nn.Conv3d(in_channels=width, out_channels=mlp_hidden_dim, kernel_size=1, stride=1),
             self.act,
-            # nn.Conv2d(in_channels=mlp_hidden_dim, out_channels=mlp_hidden_dim, kernel_size=1, stride=1),
-            # nn.GELU(),
             nn.Conv3d(in_channels=mlp_hidden_dim, out_channels=width, kernel_size=1, stride=1),
         )
 
@@ -348,27 +227,27 @@ class Block(nn.Module):
 
 class DPOTNet3D(nn.Module):
     def __init__(self, img_size=224, patch_size=16, mixing_type = 'afno',in_channels=1, out_channels = 3, in_timesteps=1, out_timesteps=1, n_blocks=4, embed_dim=768,out_layer_dim=32, depth=12,modes=32,
-                 mlp_ratio=1., representation_size=None, uniform_drop=False,
-                 drop_rate=0., drop_path_rate=0., dropcls=0, n_cls = 1, normalize=False,act='gelu',time_agg='exp_mlp'):
-        """
-        Args:
-            img_size (int, tuple): input image size
-            patch_size (int, tuple): patch size
-            in_chans (int): number of input channels
-            num_classes (int): number of classes for classification head
-            embed_dim (int): embedding dimension
-            depth (int): depth of transformer
-            num_heads (int): number of attention heads
-            mlp_ratio (int): ratio of mlp hidden dim to embedding dim
-            qkv_bias (bool): enable bias for qkv if True
-            qk_scale (float): override default qk scale of head_dim ** -0.5 if set
-            representation_size (Optional[int]): enable and set representation layer (pre-logits) to this value if set
-            drop_rate (float): dropout rate
-            attn_drop_rate (float): attention dropout rate
-            drop_path_rate (float): stochastic depth rate
-            hybrid_backbone (nn.Module): CNN backbone to use in-place of PatchEmbed module
-            norm_layer: (nn.Module): normalization layer
-        """
+                 mlp_ratio=1., n_cls = 1, normalize=False,act='gelu',time_agg='exp_mlp'):
+        '''
+
+        :param img_size: input resolution
+        :param patch_size: patch size
+        :param mixing_type: type of the mixer
+        :param in_channels: number of input channels
+        :param out_channels: number of output channels
+        :param in_timesteps: number of input timesteps
+        :param out_timesteps: number of output timesteps
+        :param n_blocks: number of heads/blocks
+        :param embed_dim: latent embedding dimension
+        :param out_layer_dim: dimension of output convolutional layer
+        :param depth: number of layers
+        :param modes: number of Fourier modes
+        :param mlp_ratio: ratio of MLP dim
+        :param n_cls: number of datasets (no influence)
+        :param normalize: whether normalize data
+        :param act: activation type
+        :param time_agg: type of temporal agg layer
+        '''
         super().__init__()
 
         # self.num_classes = num_classes
@@ -397,18 +276,10 @@ class DPOTNet3D(nn.Module):
         h = img_size // patch_size
         w = h // 2 + 1
 
-        if uniform_drop:
-            print('using uniform droppath with expect rate', drop_path_rate)
-            dpr = [drop_path_rate for _ in range(depth)]  # stochastic depth decay rule
-        else:
-            print('using linear droppath with expect rate', drop_path_rate * 0.5)
-            dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
-        # dpr = [drop_path_rate for _ in range(depth)]  # stochastic depth decay rule
 
         self.blocks = nn.ModuleList([
             Block(mixing_type=mixing_type,modes=modes,
-                width=embed_dim, mlp_ratio=mlp_ratio, channel_first = True, n_blocks=n_blocks,double_skip=False,
-                drop=drop_rate, drop_path=dpr[i], h=h, w=w,act = act)
+                width=embed_dim, mlp_ratio=mlp_ratio, channel_first = True, n_blocks=n_blocks,double_skip=False, h=h, w=w,act = act)
             for i in range(depth)])
 
         if self.normalize:
@@ -436,14 +307,9 @@ class DPOTNet3D(nn.Module):
         )
 
 
-        if dropcls > 0:
-            print('dropout %.2f before classifier' % dropcls)
-            self.final_dropout = nn.Dropout(p=dropcls)
-        else:
-            self.final_dropout = nn.Identity()
+
 
         torch.nn.init.trunc_normal_(self.pos_embed, std=.02)
-        # self.apply(self._init_weights)
 
         self.mixing_type = mixing_type
 
@@ -514,17 +380,6 @@ class DPOTNet3D(nn.Module):
         for blk in self.blocks:
             x = blk(x)
 
-        # if not get_args().checkpoint_activations:
-        #     for blk in self.blocks:
-        #         x = blk(x)
-        # else:
-        #     x = checkpoint_sequential(self.blocks, 4, x)
-
-            # classification
-
-        # cls_token = x.mean(dim=(2, 3, 4), keepdim=False)
-        # print(cls_token.shape)
-        # cls_pred = self.cls_head(cls_token)
 
         x = self.out_layer(x).permute(0, 2, 3, 4, 1)
         x = x.reshape(*x.shape[:4], self.out_timesteps, self.out_channels).contiguous()
@@ -598,7 +453,7 @@ if __name__ == "__main__":
 
     from utils.utilities import load_3d_components_from_2d
     load_path = '/ssd/logs_pretrain/AFNO_ns2d_1218_17_20_14:S_12_114400/model_99.pth'
-    net = AFNONet3D(img_size=64, patch_size=8, in_channels=3, out_channels=3, in_timesteps=10, embed_dim=1024,n_blocks=8, depth=6)
+    net = DPOTNet3D(img_size=64, patch_size=8, in_channels=3, out_channels=3, in_timesteps=10, embed_dim=1024,n_blocks=8, depth=6)
     state_dict = torch.load(load_path, map_location='cpu')['model']
 
     load_3d_components_from_2d(net, state_dict, ['blocks','time_agg'])

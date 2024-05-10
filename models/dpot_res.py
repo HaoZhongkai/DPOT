@@ -7,34 +7,9 @@ import torch.fft
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Bring your packages onto the path
-import sys
-
-# from afno.afno2d import AFNO2D
-# from afno.bfno2d import BFNO2D
-# from afno.ls import AttentionLS
-# from afno.sa import SelfAttention
-# from afno.gfn import GlobalFilter
-
 
 import math
 import logging
-from functools import partial
-from collections import OrderedDict
-# from copy import Error, deepcopy
-# from re import S
-# from numpy.lib.arraypad import pad
-# import numpy as np
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-
-# from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-# from timm.models.layers import  to_2tuple, trunc_normal_
-# import torch.fft
-from torch.nn.modules.container import Sequential
-# from main_afnonet import get_args
-# from torch.utils.checkpoint import checkpoint_sequential
 from models.filter_networks import LReLu_regular, LReLu_torch
 # from models.filter_networks import LReLu
 # from models.cno import CNOBlock
@@ -302,74 +277,11 @@ class Mlp(nn.Module):
         return x
 
 
-# class AdaptiveFourierNeuralOperator(nn.Module):
-#     def __init__(self, dim, n_blocks = 4, h=14, w=8, bias=True, softshrink=0.1):
-#         super().__init__()
-#
-#         self.hidden_size = dim
-#         self.h = h
-#         self.w = w
-#         self.num_blocks = n_blocks
-#         self.bias = bias
-#         self.block_size = self.hidden_size // self.num_blocks
-#         assert self.hidden_size % self.num_blocks == 0
-#
-#         self.scale = 0.02
-#         self.w1 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size, self.block_size))
-#         self.b1 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size))
-#         self.w2 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size, self.block_size))
-#         self.b2 = torch.nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size))
-#         self.relu = nn.ReLU()
-#
-#         if bias:
-#             self.bias = nn.Conv1d(self.hidden_size, self.hidden_size, 1)
-#         else:
-#             self.bias = None
-#
-#         self.softshrink = softshrink
-#
-#     def multiply(self, input, weights):
-#         return torch.einsum('...bd,bdk->...bk', input, weights)
-#
-#     def forward(self, x, spatial_size=None):
-#         B, N, C = x.shape
-#         if spatial_size is None:
-#             a = b = int(math.sqrt(N))
-#         else:
-#             a, b = spatial_size
-#
-#         if self.bias:
-#             bias = self.bias(x.permute(0, 2, 1)).permute(0, 2, 1)
-#         else:
-#             bias = torch.zeros(x.shape, device=x.device)
-#
-#         x = x.reshape(B, a, b, C).float()
-#         x = torch.fft.rfft2(x, dim=(1, 2), norm='ortho')
-#         x = x.reshape(B, x.shape[1], x.shape[2], self.num_blocks, self.block_size)
-#
-#         x_real_1 = F.relu(self.multiply(x.real, self.w1[0]) - self.multiply(x.imag, self.w1[1]) + self.b1[0])
-#         x_imag_1 = F.relu(self.multiply(x.real, self.w1[1]) + self.multiply(x.imag, self.w1[0]) + self.b1[1])
-#         x_real_2 = self.multiply(x_real_1, self.w2[0]) - self.multiply(x_imag_1, self.w2[1]) + self.b2[0]
-#         x_imag_2 = self.multiply(x_real_1, self.w2[1]) + self.multiply(x_imag_1, self.w2[0]) + self.b2[1]
-#
-#         x = torch.stack([x_real_2, x_imag_2], dim=-1).float()
-#         x = F.softshrink(x, lambd=self.softshrink) if self.softshrink else x
-#
-#         x = torch.view_as_complex(x)
-#         x = x.reshape(B, x.shape[1], x.shape[2], self.hidden_size)
-#         x = torch.fft.irfft2(x, s=(a, b), dim=(1, 2), norm='ortho')
-#         x = x.reshape(B, N, C)
-#
-#         return x + bias
-#
 
 class Block(nn.Module):
     def __init__(self, mixing_type = 'afno', double_skip = True, width = 32, n_blocks = 4, mlp_ratio=1., channel_first = True, modes = 32, drop=0., drop_path=0., act='gelu', h=14, w=8,):
         super().__init__()
-        # self.norm1 = norm_layer(width)
-        # self.norm1 = torch.nn.LayerNorm([width])
         self.norm1 = torch.nn.GroupNorm(8, width)
-        # self.norm1 = torch.nn.InstanceNorm2d(width,affine=True,track_running_stats=False)
         self.width = width
         self.modes = modes
         self.act = ACTIVATION[act]
@@ -377,19 +289,7 @@ class Block(nn.Module):
         if mixing_type == "afno":
             self.filter = AFNO2D(width = width, num_blocks=n_blocks, sparsity_threshold=0.01, channel_first = channel_first, modes = modes,
                                  hard_thresholding_fraction=1, hidden_size_factor=1, act=act)
-            # self.filter = AdaptiveFourierNeuralOperator(dim, h=h, w=w)
-        # elif args.mixing_type == "bfno":
-        #     self.filter = BFNO2D(hidden_size=768, num_blocks=8, hard_thresholding_fraction=1)
-        # elif args.mixing_type == "sa":
-        #     self.filter = SelfAttention(dim=768, h=14, w=8)
-        # if args.mixing_type == "gfn":
-        #     self.filter = GlobalFilter(dim=768, h=14, w=8)
-        # elif args.mixing_type == "ls":
-        #     self.filter = AttentionLS(dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.,rpe=False, nglo=1, dp_rank=2, w=2)
 
-        # self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        # self.drop_path = nn.Identity()
-        # self.norm2 = norm_layer(width)
         self.norm2 = torch.nn.GroupNorm(8, width)
         # self.norm2 = torch.nn.InstanceNorm2d(width,affine=True,track_running_stats=False)
 
@@ -400,8 +300,6 @@ class Block(nn.Module):
         self.mlp = nn.Sequential(
             nn.Conv2d(in_channels=width, out_channels=mlp_hidden_dim, kernel_size=1, stride=1),
             self.act,
-            # nn.Conv2d(in_channels=mlp_hidden_dim, out_channels=mlp_hidden_dim, kernel_size=1, stride=1),
-            # nn.GELU(),
             nn.Conv2d(in_channels=mlp_hidden_dim, out_channels=width, kernel_size=1, stride=1),
         )
 
@@ -417,11 +315,9 @@ class Block(nn.Module):
             x = x + residual
             residual = x
 
-        # x = self.mlp(x.permute(0,2,3,1)).permute(0,3,1,2)
         x = self.norm2(x)
         x = self.mlp(x)
 
-        # x = self.drop_path(x)
         x = x + residual
 
         return x
@@ -492,242 +388,32 @@ class TimeAggregator(nn.Module):
 
 
 
-'''
-    AFNO version. 12.6
-    summary: legacy, using time, channel mixing
-'''
-# class AFNONet(nn.Module):
-#     def __init__(self, img_size=224, patch_size=16, mixing_type = 'afno',in_channels=1, out_channels = 3, in_timesteps=1, out_timesteps=1, n_blocks=4, embed_dim=768, depth=12,modes=32,
-#                  mlp_ratio=1., representation_size=None, uniform_drop=False,
-#                  drop_rate=0., drop_path_rate=0., dropcls=0, n_cls = 1, normalize=False,time_agg='mlp'):
-#         """
-#         Args:
-#             img_size (int, tuple): input image size
-#             patch_size (int, tuple): patch size
-#             in_chans (int): number of input channels
-#             num_classes (int): number of classes for classification head
-#             embed_dim (int): embedding dimension
-#             depth (int): depth of transformer
-#             num_heads (int): number of attention heads
-#             mlp_ratio (int): ratio of mlp hidden dim to embedding dim
-#             qkv_bias (bool): enable bias for qkv if True
-#             qk_scale (float): override default qk scale of head_dim ** -0.5 if set
-#             representation_size (Optional[int]): enable and set representation layer (pre-logits) to this value if set
-#             drop_rate (float): dropout rate
-#             attn_drop_rate (float): attention dropout rate
-#             drop_path_rate (float): stochastic depth rate
-#             hybrid_backbone (nn.Module): CNN backbone to use in-place of PatchEmbed module
-#             norm_layer: (nn.Module): normalization layer
-#         """
-#         super().__init__()
-#
-#         # self.num_classes = num_classes
-#         self.in_channels = in_channels
-#         self.out_channels = out_channels
-#         self.in_timesteps = in_timesteps
-#         self.out_timesteps = out_timesteps
-#
-#         self.n_blocks = n_blocks
-#         self.modes = modes
-#         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
-#
-#         self.patch_embed = PatchEmbed(img_size=img_size, patch_size=patch_size, in_chans=in_channels * in_timesteps + 2, embed_dim=in_timesteps * out_channels * patch_size + 2, out_dim=embed_dim)
-#
-#         self.latent_size = self.patch_embed.out_size
-#
-#         # self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
-#         self.pos_embed = nn.Parameter(torch.zeros(1, embed_dim, self.patch_embed.out_size[0], self.patch_embed.out_size[1]))
-#         # self.pos_drop = nn.Dropout(p=drop_rate)
-#         self.normalize = normalize
-#         self.time_agg = time_agg
-#         self.n_cls = n_cls
-#
-#
-#         h = img_size // patch_size
-#         w = h // 2 + 1
-#
-#         if uniform_drop:
-#             print('using uniform droppath with expect rate', drop_path_rate)
-#             dpr = [drop_path_rate for _ in range(depth)]  # stochastic depth decay rule
-#         else:
-#             print('using linear droppath with expect rate', drop_path_rate * 0.5)
-#             dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
-#         # dpr = [drop_path_rate for _ in range(depth)]  # stochastic depth decay rule
-#
-#         self.blocks = nn.ModuleList([
-#             Block(mixing_type=mixing_type,modes=modes,
-#                 width=embed_dim, mlp_ratio=mlp_ratio, channel_first = True, n_blocks=n_blocks,double_skip=False,
-#                 drop=drop_rate, drop_path=dpr[i], h=h, w=w,)
-#             for i in range(depth)])
-#
-#         if self.normalize:
-#             self.scale_feats = nn.Linear(2 * in_channels, embed_dim)
-#         self.cls_head = nn.Sequential(
-#             nn.Linear(embed_dim, embed_dim),
-#             nn.GELU(),
-#             nn.Linear(embed_dim, embed_dim),
-#             nn.GELU(),
-#             nn.Linear(embed_dim, n_cls)
-#         )
-#
-#         ###TODO: time agg layer
-#         # if self.time_agg == 'mlp':
-#             #self.time_agg_layer = nn.Linear()
-#
-#         # self.norm = norm_layer(embed_dim)
-#
-#         # up sampler size
-#         # self.out_layer = nn.Sequential(
-#         #     nn.ConvTranspose2d(in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size),
-#         #     nn.GELU(),
-#         #     nn.Conv2d(in_channels=embed_dim, out_channels=embed_dim, kernel_size=1, stride=1),
-#         #     nn.GELU(),
-#         #     nn.Conv2d(in_channels=embed_dim, out_channels=self.out_channels * self.out_timesteps,kernel_size=1, stride=1)
-#         # )
-#         # self.out_layer = nn.Sequential(
-#         #     nn.Conv2d(in_channels=embed_dim, out_channels=in_channels * out_timesteps *patch_size**2 , kernel_size=1, stride=1),
-#         #     nn.GELU(),
-#         #     nn.PixelShuffle(patch_size),
-#         #     nn.Conv2d(in_channels=in_channels * out_timesteps , out_channels=in_channels * out_timesteps, kernel_size=3, stride=1,padding=1),
-#         #     # nn.GELU(),
-#         #     # nn.ConvTranspose2d(in_channels=, out_channels=in_channels * out_timesteps, kernel_size=patch_size, stride=patch_size),
-#         #     # nn.ConvTranspose2d(in_channels=in_channels * out_timesteps * patch_size,out_channels=in_channels * out_timesteps, kernel_size=patch_size, stride=patch_size),
-#         #     # nn.GELU(),
-#         #     # nn.Conv2d(in_channels=in_channels * out_timesteps * patch_size, out_channels=in_channels * out_timesteps, kernel_size=1,stride=1)
-#         # )
-#         ### attempt load balancing for high resolution
-#         self.out_layer = nn.Sequential(
-#             nn.ConvTranspose2d(in_channels=embed_dim, out_channels=32, kernel_size=patch_size, stride=patch_size),
-#             nn.GELU(),
-#             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=1, stride=1),
-#             nn.GELU(),
-#             nn.Conv2d(in_channels=32, out_channels=self.out_channels * self.out_timesteps,kernel_size=1, stride=1)
-#         )
-#
-#
-#         if dropcls > 0:
-#             print('dropout %.2f before classifier' % dropcls)
-#             self.final_dropout = nn.Dropout(p=dropcls)
-#         else:
-#             self.final_dropout = nn.Identity()
-#
-#         torch.nn.init.trunc_normal_(self.pos_embed, std=.02)
-#         # self.apply(self._init_weights)
-#
-#         self.mixing_type = mixing_type
-#
-#     def _init_weights(self, m):
-#         if isinstance(m, nn.Linear):
-#             torch.nn.init.trunc_normal_(m.weight, std=.02)
-#             if isinstance(m, nn.Linear) and m.bias is not None:
-#                 nn.init.constant_(m.bias, 0)
-#         elif isinstance(m, nn.LayerNorm):
-#             nn.init.constant_(m.bias, 0)
-#             nn.init.constant_(m.weight, 1.0)
-#
-#
-#
-#     def get_grid(self, x):
-#         batchsize, size_x, size_y = x.shape[0], x.shape[1], x.shape[2]
-#         gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-#         gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-#         gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
-#         gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-#         grid = torch.cat((gridx, gridy), dim=-1).to(x.device)
-#         return grid
-#
-#
-#     def get_grid_3d(self, x):
-#         batchsize, size_x, size_y, size_z = x.shape[0], x.shape[1], x.shape[2], x.shape[3]
-#         gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-#         gridx = gridx.reshape(1, size_x, 1, 1, 1).to(x.device).repeat([batchsize, 1, size_y, size_z, 1])
-#         gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
-#         gridy = gridy.reshape(1, 1, size_y, 1, 1).to(x.device).repeat([batchsize, size_x, 1, size_z, 1])
-#         gridz = torch.tensor(np.linspace(0, 1, size_z), dtype=torch.float)
-#         gridz = gridz.reshape(1, 1, 1, size_z, 1).to(x.device).repeat([batchsize, size_x, size_y, 1, 1])
-#
-#         grid = torch.cat((gridx, gridy, gridz), dim=-1)
-#         return grid
-#
-#
-#     def time_aggregate(self, x):
-#         if self.time_agg == 'mlp':
-#             x = x.view(*x.shape[:-2], -1)  #### B, X, Y, T*C
-#             grid = self.get_grid(x)
-#             x = torch.cat((x, grid), dim=-1)
-#
-#
-#
-#     ### in/out: B, X, Y, T, C
-#     def forward(self, x):
-#         if self.normalize:
-#             mu, sigma = x.mean(dim=(1,2,3),keepdim=True), x.std(dim=(1,2,3),keepdim=True) + 1e-6    # B,1,1,1,C
-#             x = (x - mu)/ sigma
-#             scale_feats = self.scale_feats(torch.cat([mu, sigma],dim=-1)).squeeze(-2).permute(0,3,1,2)   # B, 1, 1, C
-#         else:
-#             scale_feats = 0.0
-#
-#
-#         x = x.view(*x.shape[:-2], -1)     #### B, X, Y, T*C
-#         grid = self.get_grid(x)
-#
-#
-#
-#         x = torch.cat((x, grid), dim=-1).permute(0,3,1,2).contiguous()  #### B, X, Y, T*C +2 -> B, T*C+2, X, Y
-#         x = self.patch_embed(x) + scale_feats
-#         x = x + self.pos_embed
-#         # x = self.pos_drop(x)
-#
-#         for blk in self.blocks:
-#             x = blk(x)
-#
-#         # if not get_args().checkpoint_activations:
-#         #     for blk in self.blocks:
-#         #         x = blk(x)
-#         # else:
-#         #     x = checkpoint_sequential(self.blocks, 4, x)
-#
-#             # classification
-#
-#         cls_token = x.mean(dim=(2, 3), keepdim=False)
-#         # print(cls_token.shape)
-#         cls_pred = self.cls_head(cls_token)
-#
-#         x = self.out_layer(x).permute(0, 2, 3, 1)
-#         x = x.reshape(*x.shape[:3], self.out_timesteps, self.out_channels).contiguous()
-#
-#         if self.normalize:
-#             x = x * sigma  + mu
-#
-#         return x, cls_pred
 
-'''
-    AFNO version. 
-    summary: stable, using time aggregator
-'''
+
 class CDPOTNet(nn.Module):
     def __init__(self, img_size=224, patch_size=16, mixing_type = 'afno',in_channels=1, out_channels = 3, in_timesteps=1, out_timesteps=1, n_blocks=4, embed_dim=768,out_layer_dim=32, depth=12,modes=32,
                  mlp_ratio=1., representation_size=None, uniform_drop=False,
                  drop_rate=0., drop_path_rate=0., dropcls=0, n_cls = 1, normalize=False,act='gelu',time_agg='exp_mlp'):
-        """
-        Args:
-            img_size (int, tuple): input image size
-            patch_size (int, tuple): patch size
-            in_chans (int): number of input channels
-            num_classes (int): number of classes for classification head
-            embed_dim (int): embedding dimension
-            depth (int): depth of transformer
-            num_heads (int): number of attention heads
-            mlp_ratio (int): ratio of mlp hidden dim to embedding dim
-            qkv_bias (bool): enable bias for qkv if True
-            qk_scale (float): override default qk scale of head_dim ** -0.5 if set
-            representation_size (Optional[int]): enable and set representation layer (pre-logits) to this value if set
-            drop_rate (float): dropout rate
-            attn_drop_rate (float): attention dropout rate
-            drop_path_rate (float): stochastic depth rate
-            hybrid_backbone (nn.Module): CNN backbone to use in-place of PatchEmbed module
-            norm_layer: (nn.Module): normalization layer
-        """
+        '''
+
+        :param img_size: input resolution
+        :param patch_size: patch size
+        :param mixing_type: type of the mixer
+        :param in_channels: number of input channels
+        :param out_channels: number of output channels
+        :param in_timesteps: number of input timesteps
+        :param out_timesteps: number of output timesteps
+        :param n_blocks: number of heads/blocks
+        :param embed_dim: latent embedding dimension
+        :param out_layer_dim: dimension of output convolutional layer
+        :param depth: number of layers
+        :param modes: number of Fourier modes
+        :param mlp_ratio: ratio of MLP dim
+        :param n_cls: number of datasets (no influence)
+        :param normalize: whether normalize data
+        :param act: activation type
+        :param time_agg: type of temporal agg layer
+        '''
         super().__init__()
 
         # self.num_classes = num_classes

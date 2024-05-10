@@ -8,28 +8,15 @@ import time
 import argparse
 import torch
 import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
 
-import matplotlib.pyplot as plt
-
-
-import operator
-from functools import reduce
-from functools import partial
-
-from timeit import default_timer
 from torch.optim.lr_scheduler import OneCycleLR, StepLR, LambdaLR, CosineAnnealingWarmRestarts, CyclicLR
 from torch.utils.tensorboard import SummaryWriter
 from utils.optimizer import Adam, Lamb
 from utils.utilities import count_parameters, get_grid, load_model_from_checkpoint
 from utils.criterion import SimpleLpLoss
 from utils.griddataset import MixedTemporalDataset
-from utils.make_master_file import DATASET_DICT
-from models.unet import UNet
 from models.fno import FNO2d
 from models.dpot import DPOTNet
-import pickle
 
 # torch.manual_seed(0)
 # np.random.seed(0)
@@ -47,17 +34,12 @@ parser = argparse.ArgumentParser(description='Training or pretraining for the sa
 parser.add_argument('--model', type=str, default='AFNO')
 parser.add_argument('--dataset',type=str, default='ns2d')
 
-# parser.add_argument('--train_paths',nargs='+', type=str, default=['./data/ns2d/ns2d_1e-5_train.pkl','./data/ns2d/ns2d_1e-4_train.pkl','./data/ns2d/ns2d_1e-3_train.pkl'])
-# parser.add_argument('--ntrain_list', nargs='+', type=int, default=[1000, 1000, 1000])
 parser.add_argument('--train_paths',nargs='+', type=str, default=['ns2d_pdb_M1_eta1e-1_zeta1e-1'])
 parser.add_argument('--test_paths',nargs='+',type=str, default=['ns2d_fno_1e-5','swe_pdb','dr_pdb'])
 parser.add_argument('--resume_path',type=str, default='/root/files/pdessl/logs_pretrain/AFNO_ns2d_1218_17_20_14:S_12_114400/model_99.pth')
-# parser.add_argument('--resume_path',type=str, default='/root/files/pdessl/logs/AFNO_ns2d_1220_16_07_46ft_fno_1_1000/model.pth')
 parser.add_argument('--ntrain_list', nargs='+', type=int, default=[100])
 parser.add_argument('--ntest_list',nargs='+',type=int, default=[100,50,100])
-# parser.add_argument('--ntest_list',nargs='+',type=int,default=[0])
 parser.add_argument('--data_weights',nargs='+',type=int, default=[1])
-# parser.add_argument('--ntest', type=int, default=200)
 parser.add_argument('--use_writer', action='store_true',default=False)
 
 parser.add_argument('--res', type=int, default=128)
@@ -97,13 +79,9 @@ parser.add_argument('--step_size', type=int, default=100)
 parser.add_argument('--step_gamma', type=float, default=0.5)
 parser.add_argument('--warmup_epochs',type=int, default=50)
 parser.add_argument('--sub', type=int, default=1)
-# parser.add_argument('--S', type=int, default=64)
 parser.add_argument('--T_in', type=int, default=10)
 parser.add_argument('--T_ar', type=int, default=1)
-# parser.add_argument('--T_ar_test', type=int, default=10)
 parser.add_argument('--T_bundle', type=int, default=1)
-# parser.add_argument('--T', type=int, default=20)
-# parser.add_argument('--step', type=int, default=1)
 parser.add_argument('--gpu', type=str, default="3")
 parser.add_argument('--comment',type=str, default="")
 parser.add_argument('--log_path',type=str,default='')
@@ -151,17 +129,13 @@ if args.resume_path:
     print('Loading models and fine tune from {}'.format(args.resume_path))
     args.resume_path = args.resume_path
 
-    # model.load_state_dict(torch.load(args.resume_path,map_location='cuda:{}'.format(args.gpu))['model'])
     load_model_from_checkpoint(model, torch.load(args.resume_path,map_location='cuda:{}'.format(args.gpu))['model'])
 
 #### set optimizer
-if args.model in ['FNO','AFNO']:
-    if args.opt == 'lamb':
-        optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
-    else:
-        optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+if args.opt == 'lamb':
+    optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
 else:
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+    optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
 
 
 if args.lr_method == 'cycle':
@@ -216,9 +190,6 @@ with torch.no_grad():
             yy = yy.to(device)
             msk = msk.to(device)
 
-            if args.model == 'GNOT':
-                xx= get_grid(xx, n_dim=2, multi_channel=True)
-                xx, yy = xx.view(xx.shape[0], -1, xx.shape[-2], xx.shape[-1]), yy.view(yy.shape[0], -1, yy.shape[-2], yy.shape[-1])
 
             for t in range(0, yy.shape[-2], args.T_bundle):
                 y = yy[..., t:t + args.T_bundle, :]

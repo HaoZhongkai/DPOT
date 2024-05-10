@@ -49,17 +49,12 @@ parser = argparse.ArgumentParser(description='Training or pretraining for the sa
 parser.add_argument('--model', type=str, default='AFNO')
 parser.add_argument('--dataset',type=str, default='ns2d')
 
-# parser.add_argument('--train_paths',nargs='+', type=str, default=['./data/ns2d/ns2d_1e-5_train.pkl','./data/ns2d/ns2d_1e-4_train.pkl','./data/ns2d/ns2d_1e-3_train.pkl'])
-# parser.add_argument('--ntrain_list', nargs='+', type=int, default=[1000, 1000, 1000])
 parser.add_argument('--train_paths',nargs='+', type=str, default=['ns2d_pdb_M1_eta1e-1_zeta1e-1'])
 parser.add_argument('--test_paths',nargs='+',type=str, default=['ns2d_fno_1e-5','swe_pdb','dr_pdb'])
 parser.add_argument('--resume_path',type=str, default='/root/files/pdessl/logs_pretrain/AFNO_ns2d_1218_17_20_14:S_12_114400/model_99.pth')
-# parser.add_argument('--resume_path',type=str, default='/root/files/pdessl/logs/AFNO_ns2d_1220_16_07_46ft_fno_1_1000/model.pth')
 parser.add_argument('--ntrain_list', nargs='+', type=int, default=[100])
 parser.add_argument('--ntest_list',nargs='+',type=int, default=[100,50,100])
-# parser.add_argument('--ntest_list',nargs='+',type=int,default=[0])
 parser.add_argument('--data_weights',nargs='+',type=int, default=[1])
-# parser.add_argument('--ntest', type=int, default=200)
 parser.add_argument('--use_writer', action='store_true',default=False)
 
 parser.add_argument('--res', type=int, default=128)
@@ -155,17 +150,13 @@ if args.resume_path:
     print('Loading models and fine tune from {}'.format(args.resume_path))
     args.resume_path = args.resume_path
 
-    # model.load_state_dict(torch.load(args.resume_path,map_location='cuda:{}'.format(args.gpu))['model'])
     load_model_from_checkpoint(model, torch.load(args.resume_path,map_location='cuda:{}'.format(args.gpu))['model'])
 
 #### set optimizer
-if args.model in ['FNO','AFNO']:
-    if args.opt == 'lamb':
-        optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
-    else:
-        optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+if args.opt == 'lamb':
+    optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
 else:
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+    optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
 
 
 if args.lr_method == 'cycle':
@@ -233,9 +224,6 @@ for res in test_res_list:
                 msk = msk.to(device)
                 xx, yy, msk = resize(xx, out_size=[res, res], temporal=True), resize(yy, out_size=[res, res], temporal=True), refill_mask(msk, res)
 
-                if args.model == 'GNOT':
-                    xx= get_grid(xx, n_dim=2, multi_channel=True)
-                    xx, yy = xx.view(xx.shape[0], -1, xx.shape[-2], xx.shape[-1]), yy.view(yy.shape[0], -1, yy.shape[-2], yy.shape[-1])
 
                 for t in range(0, yy.shape[-2], args.T_bundle):
                     y = yy[..., t:t + args.T_bundle, :]

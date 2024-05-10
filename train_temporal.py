@@ -9,14 +9,8 @@ import argparse
 import torch
 import numpy as np
 import torch.nn as nn
-import torch.nn.functional as F
-
-import matplotlib.pyplot as plt
 
 
-import operator
-from functools import reduce
-from functools import partial
 
 from timeit import default_timer
 from torch.optim.lr_scheduler import OneCycleLR, StepLR, LambdaLR, CosineAnnealingWarmRestarts, CyclicLR
@@ -31,8 +25,6 @@ from models.dpot import DPOTNet
 from models.dpot_res import CDPOTNet
 import pickle
 
-# torch.manual_seed(0)
-# np.random.seed(0)
 
 
 
@@ -41,22 +33,16 @@ import pickle
 ################################################################
 
 
-parser = argparse.ArgumentParser(description='Training or pretraining for the same data type')
+parser = argparse.ArgumentParser(description='Training or pretraining on multiple PDE datasets')
 
-### currently no influence
-parser.add_argument('--model', type=str, default='CAFNO')
+parser.add_argument('--model', type=str, default='DPOT')
 parser.add_argument('--dataset',type=str, default='ns2d')
 
-# parser.add_argument('--train_paths',nargs='+', type=str, default=['./data/ns2d/ns2d_1e-5_train.pkl','./data/ns2d/ns2d_1e-4_train.pkl','./data/ns2d/ns2d_1e-3_train.pkl'])
-# parser.add_argument('--ntrain_list', nargs='+', type=int, default=[1000, 1000, 1000])
-# parser.add_argument('--train_paths',nargs='+', type=str, default=['ns2d_fno_1e-5'])
-parser.add_argument('--train_paths',nargs='+', type=str, default=['ns2d_pdb_M1_eta1e-1_zeta1e-1'])
+parser.add_argument('--train_paths',nargs='+', type=str, default=['ns2d_fno_1e-5','ns2d_pdb_M1_eta1e-1_zeta1e-1'])
 parser.add_argument('--test_paths',nargs='+',type=str, default=['ns2d_pdb_M1_eta1e-1_zeta1e-1'])
 parser.add_argument('--resume_path',type=str, default='')
-parser.add_argument('--ntrain_list', nargs='+', type=int, default=[1000])
-# parser.add_argument('--ntest_list',nargs='+',type=int,default=[0])
+parser.add_argument('--ntrain_list', nargs='+', type=int, default=[1000, 5000])
 parser.add_argument('--data_weights',nargs='+',type=int, default=[1])
-# parser.add_argument('--ntest', type=int, default=200)
 parser.add_argument('--use_writer', action='store_true',default=False)
 
 parser.add_argument('--res', type=int, default=128)
@@ -68,8 +54,6 @@ parser.add_argument('--width', type=int, default=512)
 parser.add_argument('--n_layers',type=int, default=4)
 parser.add_argument('--act',type=str, default='gelu')
 
-### GNOT params
-parser.add_argument('--max_nodes',type=int, default=-1)
 
 ### FNO params
 parser.add_argument('--modes', type=int, default=32)
@@ -77,7 +61,7 @@ parser.add_argument('--use_ln',type=int, default=0)
 parser.add_argument('--normalize',type=int, default=0)
 
 
-### AFNO
+### DPOT
 parser.add_argument('--patch_size',type=int, default=8)
 parser.add_argument('--n_blocks',type=int, default=8)
 parser.add_argument('--mlp_ratio',type=int, default=1)
@@ -88,20 +72,15 @@ parser.add_argument('--epochs', type=int, default=500)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--opt',type=str, default='adam', choices=['adam','lamb'])
 parser.add_argument('--beta1',type=float,default=0.9)
-parser.add_argument('--beta2',type=float,default=0.999)
-parser.add_argument('--lr_method',type=str, default='step')
+parser.add_argument('--beta2',type=float,default=0.9)
+parser.add_argument('--lr_method',type=str, default='cycle')
 parser.add_argument('--grad_clip',type=float, default=10000.0)
 parser.add_argument('--step_size', type=int, default=100)
 parser.add_argument('--step_gamma', type=float, default=0.5)
-parser.add_argument('--warmup_epochs',type=int, default=50)
-parser.add_argument('--sub', type=int, default=1)
-# parser.add_argument('--S', type=int, default=64)
+parser.add_argument('--warmup_epochs',type=int, default=100)
 parser.add_argument('--T_in', type=int, default=10)
 parser.add_argument('--T_ar', type=int, default=1)
-# parser.add_argument('--T_ar_test', type=int, default=10)
 parser.add_argument('--T_bundle', type=int, default=1)
-# parser.add_argument('--T', type=int, default=20)
-# parser.add_argument('--step', type=int, default=1)
 parser.add_argument('--gpu', type=str, default="5")
 parser.add_argument('--comment',type=str, default="")
 parser.add_argument('--log_path',type=str,default='')
@@ -146,18 +125,14 @@ else:
 if args.resume_path:
     print('Loading models and fine tune from {}'.format(args.resume_path))
     args.resume_path = args.resume_path
-
-    # model.load_state_dict(torch.load(args.resume_path,map_location='cuda:{}'.format(args.gpu))['model'])
     load_model_from_checkpoint(model, torch.load(args.resume_path,map_location='cuda:{}'.format(args.gpu))['model'])
 
+
 #### set optimizer
-if args.model in ['FNO','AFNO']:
-    if args.opt == 'lamb':
-        optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
-    else:
-        optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+if args.opt == 'lamb':
+    optimizer = Lamb(model.parameters(), lr=args.lr, betas = (args.beta1, args.beta2), adam=True, debias=False,weight_decay=1e-4)
 else:
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
+    optimizer = Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=1e-6)
 
 
 if args.lr_method == 'cycle':
@@ -191,6 +166,7 @@ if args.use_writer:
 
 else:
     writer = None
+
 print(model)
 count_parameters(model)
 
@@ -220,13 +196,6 @@ for ep in range(args.epochs):
         msk = msk.to(device)
         cls = cls.to(device)
 
-        ## random sample nodes for point cloud based transformer
-        if args.model == 'GNOT':
-            xx= get_grid(xx, n_dim=2, multi_channel=True)
-            xx, yy = xx.view(xx.shape[0], -1,xx.shape[-2], xx.shape[-1]), yy.view(yy.shape[0], -1, yy.shape[-2],yy.shape[-1])
-            if args.max_nodes > -1:
-                n_ids = torch.randperm(xx.shape[1])[:args.max_nodes]
-                xx, yy = xx[:, n_ids], yy[:, n_ids]
 
         ## auto-regressive training loop, support 1. noise injection, 2. long rollout backward, 3. temporal bundling prediction
         for t in range(0, yy.shape[-2], args.T_bundle):
@@ -251,12 +220,9 @@ for ep in range(args.epochs):
 
         train_l2_step += loss.item()
         l2_full = myloss(pred, yy, mask=msk)
-        # l2_full = myloss(pred.reshape(args.batch_size, -1), yy.reshape(args.batch_size, -1))
         train_l2_full += l2_full.item()
 
         optimizer.zero_grad()
-        # avg_loss = loss / xx.shape[0]
-        # avg_loss.backward()
         total_loss = loss  # + 1.0 * cls_loss
         total_loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
@@ -269,7 +235,6 @@ for ep in range(args.epochs):
         if args.use_writer:
             writer.add_scalar("train_loss_step", loss.item()/(xx.shape[0] * yy.shape[-2] / args.T_bundle), iter)
             writer.add_scalar("train_loss_full", l2_full / xx.shape[0], iter)
-            writer.add_scalar("cls_acc", cls_acc, iter)
 
             ## reset model
             if loss.item() > 10 * loss_previous : # or (ep > 50 and l2_full / xx.shape[0] > 0.9):
@@ -282,7 +247,6 @@ for ep in range(args.epochs):
         t_train += default_timer() -  t_1
         t_1 = default_timer()
 
-        # print('training ',time.time() - t_0)
 
 
     test_l2_fulls, test_l2_steps = [], []
@@ -296,9 +260,6 @@ for ep in range(args.epochs):
                 yy = yy.to(device)
                 msk = msk.to(device)
 
-                if args.model == 'GNOT':
-                    xx= get_grid(xx, n_dim=2, multi_channel=True)
-                    xx, yy = xx.view(xx.shape[0], -1, xx.shape[-2], xx.shape[-1]), yy.view(yy.shape[0], -1, yy.shape[-2], yy.shape[-1])
 
                 for t in range(0, yy.shape[-2], args.T_bundle):
                     y = yy[..., t:t + args.T_bundle, :]
@@ -321,7 +282,6 @@ for ep in range(args.epochs):
             if args.use_writer:
                 writer.add_scalar("test_loss_step_{}".format(test_paths[id]), test_l2_step_avg, ep)
                 writer.add_scalar("test_loss_full_{}".format(test_paths[id]), test_l2_full_avg, ep)
-                # writer.add_histogram('test_loss_full_hist_{}'.format(test_paths[id]), torch.tensor(test_l2_fulls), ep)
 
     if args.use_writer:
         torch.save({'args': args, 'model': model.state_dict(), 'optimizer': optimizer.state_dict()}, model_path)
@@ -329,7 +289,7 @@ for ep in range(args.epochs):
     t_test = default_timer() - t_1
     t2 = t_1 = default_timer()
     lr = optimizer.param_groups[0]['lr']
-    print('epoch {}, time {:.5f}, lr {:.2e}, train l2 step {:.5f} train l2 full {:.5f}, test l2 step {} test l2 full {}, cls acc {:.5f}, time train avg {:.5f} load avg {:.5f} test {:.5f}'.format(ep, t2 - t1, lr,train_l2_step_avg, train_l2_full_avg,', '.join(['{:.5f}'.format(val) for val in test_l2_steps]),', '.join(['{:.5f}'.format(val) for val in test_l2_fulls]), cls_acc, t_train / len(train_loader), t_load / len(train_loader), t_test))
+    print('epoch {}, time {:.5f}, lr {:.2e}, train l2 step {:.5f} train l2 full {:.5f}, test l2 step {} test l2 full {}, time train avg {:.5f} load avg {:.5f} test {:.5f}'.format(ep, t2 - t1, lr,train_l2_step_avg, train_l2_full_avg,', '.join(['{:.5f}'.format(val) for val in test_l2_steps]),', '.join(['{:.5f}'.format(val) for val in test_l2_fulls]), t_train / len(train_loader), t_load / len(train_loader), t_test))
 
 
 
