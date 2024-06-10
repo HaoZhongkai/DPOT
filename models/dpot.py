@@ -243,8 +243,8 @@ class TimeAggregator(nn.Module):
 
 
 class DPOTNet(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, mixing_type = 'afno',in_channels = 1, out_channels = 3, in_timesteps = 1, out_timesteps = 1, n_blocks = 4, embed_dim = 768, out_layer_dim = 32, depth = 12, modes = 32,
-                 mlp_ratio=1., n_cls = 1, normalize=False, act='gelu', time_agg='exp_mlp'):
+    def __init__(self, img_size=224, patch_size=16, mixing_type = 'afno',in_channels = 1, out_channels = 4, in_timesteps = 1, out_timesteps = 1, n_blocks = 4, embed_dim = 768, out_layer_dim = 32, depth = 12, modes = 32,
+                 mlp_ratio=1., n_cls = 12, normalize=False, act='gelu', time_agg='exp_mlp'):
         '''
 
         :param img_size: input resolution

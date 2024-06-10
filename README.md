@@ -1,6 +1,6 @@
 ## DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training (ICML'2024)
 
-Code for [paper](https://arxiv.org/pdf/2403.03542) DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training (ICML'2024). It  pretrains neural operator transformers (from **7M** to **1B**)  on multiple PDE datasets. We will release the pre-trained weights soon.
+Code for [paper](https://arxiv.org/pdf/2403.03542) DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training (ICML'2024). It  pretrains neural operator transformers (from **7M** to **1B**)  on multiple PDE datasets. Pre-trained weights could be found at https://huggingface.co/hzk17/DPOT.
 
 ![fig1](/resources/dpot.jpg)
 
@@ -11,6 +11,26 @@ Our pre-trained DPOT achieves the state-of-the-art performance on multiple PDE d
 
 
 ### Usage 
+
+##### Pre-trained models
+
+We have five pre-trained checkpoints of different sizes. Pre-trained weights are at https://huggingface.co/hzk17/DPOT.
+
+| Size   | Attention dim | MLP dim | Layers | Heads | Model size |
+| ------ | ------------- | ------- | ------ | ----- | ---------- |
+| Tiny   | 512           | 512     | 4      | 4     | 7M         |
+| Small  | 1024          | 1024    | 6      | 8     | 30M        |
+| Medium | 1024          | 4096    | 12     | 8     | 122M       |
+| Large  | 1536          | 6144    | 24     | 16    | 509M       |
+| Huge   | 2048          | 8092    | 27     | 8     | 1.03B      |
+
+Here is an example code of loading pre-trained model.
+```python
+model = DPOTNet(img_size=128, patch_size=8, mixing_type='afno', in_channels=4, in_timesteps=10, out_timesteps=1, out_channels=4, normalize=False, embed_dim=512, modes=32, depth=4, n_blocks=4, mlp_ratio=1, out_layer_dim=32, n_cls=12)
+model.load_state_dict(torch.load('model_Ti.pth')['model'])
+```
+
+
 
 ##### Dataset Protocol
 
